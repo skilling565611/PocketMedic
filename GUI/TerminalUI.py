@@ -15,6 +15,7 @@ class TerminalUI:
         ("3", "Network Diagnostics", "network"),
         ("4", "Startup Manager", "startup"),
         ("5", "Backup", "backup"),
+        ("6", "Rebuild Assistant", "rebuild"),
         ("Q", "Quit", "quit"),
     ]
 
@@ -128,6 +129,14 @@ class TerminalUI:
         else:
             print("    No backups found.")
 
+    def _action_rebuild(self) -> None:
+        from Core.RebuildAssistant import RebuildAssistant
+
+        assistant = RebuildAssistant(logger=self._logger)
+        report = assistant.run_workflow()
+        print("\n  -- PocketMedic V2.1 Rebuild Assistant --")
+        self._print_rebuild_summary(report)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -135,6 +144,28 @@ class TerminalUI:
     def _log(self, message: str) -> None:
         if self._logger:
             self._logger.info(message)
+
+    @staticmethod
+    def _print_rebuild_summary(report: dict) -> None:
+        summary = report.get("summary", {})
+        checklist = report.get("checklist", [])
+        ready_label = "READY" if summary.get("ready") else "NEEDS REVIEW"
+
+        print(f"\n  Status: {ready_label}")
+        print(
+            "  "
+            f"Passed: {summary.get('passed', 0)} | "
+            f"Warnings: {summary.get('warnings', 0)} | "
+            f"Errors: {summary.get('errors', 0)}"
+        )
+
+        for index, step in enumerate(checklist, start=1):
+            status = str(step.get("status", "unknown")).upper()
+            print(f"\n  {index}. [{status}] {step.get('title', 'Untitled step')}")
+            print(f"     {step.get('message', '')}")
+            details = step.get("details", {})
+            if details:
+                TerminalUI._print_value(details, indent=5)
 
     @staticmethod
     def _print_report(report: dict) -> None:
