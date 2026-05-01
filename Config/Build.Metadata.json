@@ -1,7 +1,7 @@
 {
-    "version": "3.0.1",
+    "version": "3.1.0",
     "channel": "stable",
-    "build_name": "PocketMedic 3.0.1",
+    "build_name": "PocketMedic 3.1.0",
     "icon_path": "Assets/PocketMedic.ico",
     "pyinstaller_spec": "PocketMedic.spec",
     "installer_cache": {

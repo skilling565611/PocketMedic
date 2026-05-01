@@ -1,6 +1,6 @@
 {
     "app_name": "PocketMedic",
-    "version": "3.0.1",
+    "version": "3.1.0",
     "log_level": "INFO",
     "log_dir": "Logs",
     "portable_tools_dir": "PortableTools",
@@ -13,7 +13,6 @@
     ],
     "package_definitions_path": "Config/Package.Definitions.json",
     "build_metadata_path": "Config/Build.Metadata.json",
-    "use_winget_fallback": false,
     "installer_dry_run_default": true,
     "installer_cache": {
         "local_dir": "Installers",

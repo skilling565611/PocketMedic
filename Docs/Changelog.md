@@ -16,9 +16,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Documentation and runtime folders
 
 ### Changed
-- V3.1 installer behavior now prefers local, OneDrive, and USB installer sources before optional winget fallback
-- Winget fallback is disabled by default through `use_winget_fallback: false`
+- V3.1 installer behavior now accepts only local, OneDrive, and USB installer EXE sources
+- Winget fallback is disabled for installer actions
 - App Installer display now reports installed status, local installer availability, installer path, install source, and fallback state
+
+---
+
+## [3.1.0] - 2026-05-01
+
+### Changed
+- Installer readiness is now EXE-only from approved installer folders
+- Winget, WindowsApps aliases, Microsoft Store aliases, `py.exe`, and launcher aliases are not installer sources
+- Installed detection remains diagnostic and no longer controls install readiness
+- App Installer displays `Ready from EXE` or `Missing installer EXE`
 
 ---
 

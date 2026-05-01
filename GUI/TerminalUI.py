@@ -233,8 +233,8 @@ class TerminalUI:
         print("\n  -- App Installer Framework --")
         self._print_install_plan(plan)
 
-        if plan.get("missing_count", 0) == 0:
-            print("\n  All enabled packages are already detected.")
+        if plan.get("actionable_count", 0) == 0:
+            print("\n  No install actions are available or needed.")
             return
 
         print("\n  Type DRYRUN to preview missing installer commands.")
@@ -305,13 +305,10 @@ class TerminalUI:
 
     @staticmethod
     def _print_install_plan(plan: dict) -> None:
-        manager = plan.get("manager_status", {}).get("active_manager")
-        fallback_enabled = plan.get("use_winget_fallback", False)
-        fallback_status = "enabled" if fallback_enabled else "disabled"
-        print(f"\n  Winget fallback: {fallback_status}")
-        if fallback_enabled:
-            print(f"  Winget available: {manager or 'not detected'}")
-        print(f"  Missing packages: {plan.get('missing_count', 0)}")
+        print(f"\n  Installer policy: {plan.get('installer_policy', 'EXE-only')}")
+        print("  Winget fallback: disabled")
+        print(f"  Missing installer EXEs: {plan.get('missing_count', 0)}")
+        print(f"  Runnable install actions: {plan.get('actionable_count', 0)}")
         print("  Manual confirmation required: yes")
 
         for package in plan.get("packages", []):
@@ -328,12 +325,22 @@ class TerminalUI:
                 print(f"    installer_location: {local_installer.get('source')}")
             else:
                 print("    installer_location: (none)")
-            if package.get("winget_fallback_enabled"):
-                fallback = package.get("winget_fallback_command") or "(none)"
-            else:
-                fallback = "disabled"
-            print(f"    winget_fallback: {fallback}")
+            print("    winget_fallback: disabled")
             print(f"    detection_source: {package.get('detection', {}).get('source')}")
+            TerminalUI._print_detected_executables(package.get("detection", {}))
+
+    @staticmethod
+    def _print_detected_executables(detection: dict) -> None:
+        matches = detection.get("command_matches", [])
+        if not matches:
+            print("    detected_executables: (none)")
+            return
+
+        print("    detected_executables:")
+        for match in matches:
+            path = match.get("path") or "(none)"
+            valid = match.get("valid_diagnostic")
+            print(f"      - {match.get('command')}: {path} (diagnostic_valid={valid})")
 
     @staticmethod
     def _print_value(value, indent: int) -> None:

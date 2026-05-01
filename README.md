@@ -4,7 +4,7 @@
 
 ## Version
 
-Current version: **3.0.1**
+Current version: **3.1.0**
 
 PocketMedic is a lightweight, portable Python toolkit designed to diagnose,
 maintain, rebuild, and repair Windows PCs while staying laptop-friendly for
@@ -21,10 +21,10 @@ systems like Arctic Prime.
 | Startup Manager | `Core/Startup.py` | Stable |
 | Backup & Restore | `Core/Backup.py` | Stable |
 | OneDrive Sync | `Core/OneDrive.py` | Stable |
-| App Installer Framework | `Core/Installer.py` | v3.0.1 |
+| App Installer Framework | `Core/Installer.py` | v3.1.0 |
 | Storage Helpers | `Core/Storage.py` | Stable |
 | Rebuild Assistant | `Core/RebuildAssistant.py` | v2.1+ |
-| Version / Build Info | `Core/BuildInfo.py` | v3.0.1 |
+| Version / Build Info | `Core/BuildInfo.py` | v3.1.0 |
 | Terminal UI | `GUI/TerminalUI.py` | Active |
 
 ## Quick Start
@@ -43,13 +43,13 @@ pip install psutil
 
 Package definitions live in `Config/Package.Definitions.json`.
 
-PocketMedic 3.0.1 detects installed apps from:
+PocketMedic 3.1.0 detects installed apps from:
 
 - Windows uninstall registry entries
 - known executable commands
 - known executable paths
 
-Local installer EXEs are searched before any fallback:
+Install readiness is EXE-only. PocketMedic searches approved installer folders:
 
 - `Installers/` beside the app or EXE
 - `OneDrive/PocketMedic/Installers/`
@@ -61,8 +61,8 @@ requires typed confirmation:
 - `DRYRUN` previews installer commands
 - `RUN` executes missing installers
 
-Winget is disabled by default and is retained as an optional fallback only.
-Enable it with `use_winget_fallback: true` in `Config/Global.Settings.json`.
+Winget, Microsoft Store aliases, WindowsApps aliases, `py.exe`, and launcher
+aliases are not installer sources.
 
 ## PyInstaller Build
 
@@ -98,7 +98,7 @@ The active profile is set in `Config/Global.Settings.json`.
 - No uninstall workflow is exposed.
 - No package is auto-installed.
 - Installer execution requires explicit terminal confirmation.
-- Winget fallback is disabled unless explicitly enabled in config.
+- Installer readiness requires an actual `.exe` in an approved installer folder.
 - Dry-run mode is available for install preview.
 
 ## License

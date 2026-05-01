@@ -43,16 +43,12 @@ class Installer:
         return packages
 
     def manager_status(self) -> Dict[str, object]:
-        """Return availability details for supported package managers."""
-        managers = {
-            manager: shutil.which(manager)
-            for manager in ("winget", "choco", "apt", "brew")
-        }
-        active = self._detect_manager()
+        """Return installer source policy details."""
         return {
-            "active_manager": active,
-            "available_managers": managers,
-            "ready": active is not None,
+            "active_manager": None,
+            "available_managers": {},
+            "ready": False,
+            "policy": "EXE-only installer sources",
         }
 
     def is_installed(self, tool_name: str) -> bool:
@@ -68,10 +64,16 @@ class Installer:
         paths = detect.get("paths", [])
         registry_names = detect.get("registry_display_names", [])
 
-        command_matches = [
-            {"command": command, "path": shutil.which(command)}
-            for command in commands
-        ]
+        command_matches = []
+        for command in commands:
+            path = shutil.which(command)
+            command_matches.append(
+                {
+                    "command": command,
+                    "path": path,
+                    "valid_diagnostic": self._valid_detected_executable(command, path),
+                }
+            )
         path_matches = [
             {
                 "path": self._expand_path(path),
@@ -84,7 +86,7 @@ class Installer:
         )
         installed = (
             bool(registry_matches)
-            or any(match["path"] for match in command_matches)
+            or any(match["path"] and match["valid_diagnostic"] for match in command_matches)
             or any(match["exists"] for match in path_matches)
         )
         self._log(f"detect_package({definition.get('key', 'unknown')!r}) -> {installed}")
@@ -103,7 +105,6 @@ class Installer:
         use_winget_fallback: bool = False,
     ) -> Dict[str, Any]:
         """Build a package install plan without installing anything."""
-        manager = self._detect_manager() if use_winget_fallback else None
         packages = []
         for definition in definitions or self.load_package_definitions():
             if not include_disabled and not definition.get("enabled", True):
@@ -111,7 +112,6 @@ class Installer:
 
             detection = self.detect_package(definition)
             local_installer = self.find_local_installer(definition)
-            installer_status = self._installer_status(detection["installed"], local_installer)
             install_source = self._install_source(local_installer)
             packages.append(
                 {
@@ -121,39 +121,34 @@ class Installer:
                     "enabled": definition.get("enabled", True),
                     "winget_id": definition.get("winget_id"),
                     "installed": detection["installed"],
-                    "installer_status": installer_status,
+                    "installer_status": self._installer_status(local_installer),
+                    "install_ready": local_installer is not None,
                     "local_installer_found": local_installer is not None,
                     "local_installer": local_installer,
                     "installer_path": local_installer["path"] if local_installer else None,
                     "install_source": install_source,
-                    "winget_fallback_enabled": use_winget_fallback,
-                    "winget_fallback_command": (
-                        self.preview_definition_install(definition, manager)
-                        if use_winget_fallback
-                        else ""
-                    ),
+                    "winget_fallback_enabled": False,
+                    "winget_fallback_command": "",
                     "detection": detection,
                 }
             )
 
-        missing = [package for package in packages if not package["installed"]]
+        missing = [package for package in packages if not package["install_ready"]]
+        actionable = [
+            package
+            for package in packages
+            if package["install_ready"] and not package["installed"]
+        ]
         manager_status = self.manager_status()
-        if not use_winget_fallback:
-            manager_status = {
-                **manager_status,
-                "active_manager": None,
-                "ready": False,
-                "fallback_available": bool(
-                    manager_status["available_managers"].get("winget")
-                ),
-            }
         return {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
             "manager_status": manager_status,
-            "use_winget_fallback": use_winget_fallback,
+            "use_winget_fallback": False,
+            "installer_policy": "EXE-only",
             "manual_confirmation_required": True,
             "packages": packages,
             "missing_count": len(missing),
+            "actionable_count": len(actionable),
         }
 
     def preview_definition_install(
@@ -268,26 +263,16 @@ class Installer:
                 if not package.get("installed")
             ]
 
-        use_winget_fallback = plan.get("use_winget_fallback", False)
-        manager = (
-            plan.get("manager_status", {}).get("active_manager")
-            if use_winget_fallback
-            else None
-        )
         results = []
-        definitions = {
-            definition.get("key"): definition
-            for definition in self.load_package_definitions()
-        }
         for package in plan.get("packages", []):
-            if package.get("installed"):
-                continue
-
             key = package.get("key")
-            definition = definitions.get(key)
-            if not definition:
+            if package.get("installed"):
                 results.append(
-                    {"key": key, "status": "failed", "message": "Definition not found."}
+                    {
+                        "key": key,
+                        "status": "skipped_installed",
+                        "message": "Already installed; installer source shown for future rebuild use only.",
+                    }
                 )
                 continue
 
@@ -295,15 +280,12 @@ class Installer:
             if local_installer:
                 command = [local_installer["path"]]
                 install_source = local_installer.get("source", "Local")
-            elif use_winget_fallback and manager:
-                command = self._build_definition_install_cmd(manager, definition)
-                install_source = "winget"
             else:
                 results.append(
                     {
                         "key": key,
                         "status": "missing",
-                        "message": "No local installer found. Winget fallback is disabled.",
+                        "message": "Missing installer EXE.",
                     }
                 )
                 continue
@@ -422,12 +404,10 @@ class Installer:
         return os.path.expandvars(os.path.expanduser(path))
 
     @staticmethod
-    def _installer_status(installed: bool, local_installer: Optional[Dict[str, str]]) -> str:
-        if installed:
-            return "Installed"
+    def _installer_status(local_installer: Optional[Dict[str, str]]) -> str:
         if local_installer:
-            return "Available"
-        return "Missing"
+            return "Ready from EXE"
+        return "Missing installer EXE"
 
     @staticmethod
     def _install_source(local_installer: Optional[Dict[str, str]]) -> str:
@@ -441,16 +421,31 @@ class Installer:
     @staticmethod
     def _detection_source(
         registry_matches: List[Dict[str, str]],
-        command_matches: List[Dict[str, Optional[str]]],
+        command_matches: List[Dict[str, object]],
         path_matches: List[Dict[str, object]],
     ) -> str:
         if registry_matches:
             return "registry"
-        if any(match["path"] for match in command_matches):
+        if any(match["path"] and match["valid_diagnostic"] for match in command_matches):
             return "executable"
         if any(match["exists"] for match in path_matches):
             return "known_path"
         return "not_detected"
+
+    @staticmethod
+    def _valid_detected_executable(command: str, path: Optional[str]) -> bool:
+        if not path:
+            return False
+
+        normalized_command = command.casefold()
+        normalized_path = os.path.normcase(path)
+        if normalized_command in {"py", "py.exe"}:
+            return False
+        if "windowsapps" in normalized_path.casefold():
+            return False
+        if os.path.basename(normalized_path).casefold() in {"py.exe"}:
+            return False
+        return os.path.isfile(path)
 
     def _find_registry_matches(self, names: List[Optional[str]]) -> List[Dict[str, str]]:
         if os.name != "nt":
