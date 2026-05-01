@@ -15,6 +15,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Config profiles for ArcticPrime and ControlPrime
 - Documentation and runtime folders
 
+### Changed
+- V3.1 installer behavior now prefers local, OneDrive, and USB installer sources before optional winget fallback
+- Winget fallback is disabled by default through `use_winget_fallback: false`
+- App Installer display now reports installed status, local installer availability, installer path, install source, and fallback state
+
 ---
 
 ## [3.0.1] - 2026-05-01

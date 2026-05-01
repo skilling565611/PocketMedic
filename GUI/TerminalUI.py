@@ -155,6 +155,7 @@ class TerminalUI:
             "package_definitions_path",
             "Config/Package.Definitions.json",
         )
+        use_winget_fallback = settings.get("use_winget_fallback", False)
         startup_delay = settings.get("startup_delay_seconds", 30)
         offload_relative = settings.get("storage_offload", {}).get(
             "default_relative_path",
@@ -176,7 +177,8 @@ class TerminalUI:
         report = {
             "installer_engine": {
                 "install_plan": installer.build_install_plan(
-                    installer.load_package_definitions(definitions_path)
+                    installer.load_package_definitions(definitions_path),
+                    use_winget_fallback=use_winget_fallback,
                 ),
             },
             "onedrive_integration": onedrive_status,
@@ -214,6 +216,7 @@ class TerminalUI:
             "package_definitions_path",
             "Config/Package.Definitions.json",
         )
+        use_winget_fallback = settings.get("use_winget_fallback", False)
         installer = Installer(logger=self._logger)
         definitions = installer.load_package_definitions(definitions_path)
         if not definitions:
@@ -222,7 +225,10 @@ class TerminalUI:
             print("  Installer planning is unavailable until config is restored.")
             return
 
-        plan = installer.build_install_plan(definitions)
+        plan = installer.build_install_plan(
+            definitions,
+            use_winget_fallback=use_winget_fallback,
+        )
 
         print("\n  -- App Installer Framework --")
         self._print_install_plan(plan)
@@ -300,7 +306,11 @@ class TerminalUI:
     @staticmethod
     def _print_install_plan(plan: dict) -> None:
         manager = plan.get("manager_status", {}).get("active_manager")
-        print(f"\n  Package manager: {manager or 'not detected'}")
+        fallback_enabled = plan.get("use_winget_fallback", False)
+        fallback_status = "enabled" if fallback_enabled else "disabled"
+        print(f"\n  Winget fallback: {fallback_status}")
+        if fallback_enabled:
+            print(f"  Winget available: {manager or 'not detected'}")
         print(f"  Missing packages: {plan.get('missing_count', 0)}")
         print("  Manual confirmation required: yes")
 
@@ -309,13 +319,20 @@ class TerminalUI:
             print(f"\n  [{status}] {package.get('display_name')}")
             print(f"    key: {package.get('key')}")
             print(f"    category: {package.get('category')}")
-            print(f"    winget_id: {package.get('winget_id')}")
+            print(f"    installed: {package.get('installed')}")
+            print(f"    local_installer_found: {package.get('local_installer_found')}")
+            print(f"    installer_path: {package.get('installer_path') or '(none)'}")
+            print(f"    install_source: {package.get('install_source')}")
             local_installer = package.get("local_installer")
             if local_installer:
-                print(f"    local_installer: {local_installer.get('path')}")
+                print(f"    installer_location: {local_installer.get('source')}")
             else:
-                print("    local_installer: (none)")
-            print(f"    winget_fallback: {package.get('install_command') or '(none)'}")
+                print("    installer_location: (none)")
+            if package.get("winget_fallback_enabled"):
+                fallback = package.get("winget_fallback_command") or "(none)"
+            else:
+                fallback = "disabled"
+            print(f"    winget_fallback: {fallback}")
             print(f"    detection_source: {package.get('detection', {}).get('source')}")
 
     @staticmethod

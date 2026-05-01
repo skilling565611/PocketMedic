@@ -49,7 +49,7 @@ PocketMedic 3.0.1 detects installed apps from:
 - known executable commands
 - known executable paths
 
-Local installer EXEs are searched before winget fallback:
+Local installer EXEs are searched before any fallback:
 
 - `Installers/` beside the app or EXE
 - `OneDrive/PocketMedic/Installers/`
@@ -61,7 +61,8 @@ requires typed confirmation:
 - `DRYRUN` previews installer commands
 - `RUN` executes missing installers
 
-Winget is retained as an optional fallback only.
+Winget is disabled by default and is retained as an optional fallback only.
+Enable it with `use_winget_fallback: true` in `Config/Global.Settings.json`.
 
 ## PyInstaller Build
 
@@ -97,6 +98,7 @@ The active profile is set in `Config/Global.Settings.json`.
 - No uninstall workflow is exposed.
 - No package is auto-installed.
 - Installer execution requires explicit terminal confirmation.
+- Winget fallback is disabled unless explicitly enabled in config.
 - Dry-run mode is available for install preview.
 
 ## License

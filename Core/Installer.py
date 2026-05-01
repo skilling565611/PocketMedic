@@ -100,9 +100,10 @@ class Installer:
         self,
         definitions: Optional[List[Dict[str, Any]]] = None,
         include_disabled: bool = False,
+        use_winget_fallback: bool = False,
     ) -> Dict[str, Any]:
         """Build a package install plan without installing anything."""
-        manager = self._detect_manager()
+        manager = self._detect_manager() if use_winget_fallback else None
         packages = []
         for definition in definitions or self.load_package_definitions():
             if not include_disabled and not definition.get("enabled", True):
@@ -111,6 +112,7 @@ class Installer:
             detection = self.detect_package(definition)
             local_installer = self.find_local_installer(definition)
             installer_status = self._installer_status(detection["installed"], local_installer)
+            install_source = self._install_source(local_installer)
             packages.append(
                 {
                     "key": definition.get("key"),
@@ -120,16 +122,35 @@ class Installer:
                     "winget_id": definition.get("winget_id"),
                     "installed": detection["installed"],
                     "installer_status": installer_status,
+                    "local_installer_found": local_installer is not None,
                     "local_installer": local_installer,
-                    "install_command": self.preview_definition_install(definition, manager),
+                    "installer_path": local_installer["path"] if local_installer else None,
+                    "install_source": install_source,
+                    "winget_fallback_enabled": use_winget_fallback,
+                    "winget_fallback_command": (
+                        self.preview_definition_install(definition, manager)
+                        if use_winget_fallback
+                        else ""
+                    ),
                     "detection": detection,
                 }
             )
 
         missing = [package for package in packages if not package["installed"]]
+        manager_status = self.manager_status()
+        if not use_winget_fallback:
+            manager_status = {
+                **manager_status,
+                "active_manager": None,
+                "ready": False,
+                "fallback_available": bool(
+                    manager_status["available_managers"].get("winget")
+                ),
+            }
         return {
             "generated_at": datetime.now().isoformat(timespec="seconds"),
-            "manager_status": self.manager_status(),
+            "manager_status": manager_status,
+            "use_winget_fallback": use_winget_fallback,
             "manual_confirmation_required": True,
             "packages": packages,
             "missing_count": len(missing),
@@ -153,18 +174,23 @@ class Installer:
             key = definition.get("key", "")
             patterns = [f"{key}.exe", f"{key}-*.exe", f"*{key}*.exe"]
 
-        for directory in self.get_installer_search_paths():
+        for location in self.get_installer_search_paths():
+            directory = location["path"]
             if not os.path.isdir(directory):
                 continue
             for pattern in patterns:
                 match = self._first_match(directory, pattern)
                 if match:
-                    return {"path": match, "source": directory}
+                    return {
+                        "path": match,
+                        "source": location["source"],
+                        "directory": directory,
+                    }
         return None
 
-    def get_installer_search_paths(self) -> List[str]:
+    def get_installer_search_paths(self) -> List[Dict[str, str]]:
         """Return local EXE installer search paths."""
-        paths = [app_path("Installers")]
+        paths = [{"source": "Local", "path": app_path("Installers")}]
 
         onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
         if not onedrive:
@@ -172,10 +198,18 @@ class Installer:
             if os.path.isdir(candidate):
                 onedrive = candidate
         if onedrive:
-            paths.append(os.path.join(onedrive, "PocketMedic", "Installers"))
+            paths.append(
+                {
+                    "source": "OneDrive",
+                    "path": os.path.join(onedrive, "PocketMedic", "Installers"),
+                }
+            )
 
-        paths.extend(os.path.join(drive, "Installers") for drive in self._removable_drives())
-        return self._dedupe(paths)
+        paths.extend(
+            {"source": "USB", "path": os.path.join(drive, "Installers")}
+            for drive in self._removable_drives()
+        )
+        return self._dedupe_locations(paths)
 
     def verify_packages(self, package_names: List[str]) -> List[Dict[str, object]]:
         """Return install status and install previews for requested packages."""
@@ -234,7 +268,12 @@ class Installer:
                 if not package.get("installed")
             ]
 
-        manager = plan.get("manager_status", {}).get("active_manager")
+        use_winget_fallback = plan.get("use_winget_fallback", False)
+        manager = (
+            plan.get("manager_status", {}).get("active_manager")
+            if use_winget_fallback
+            else None
+        )
         results = []
         definitions = {
             definition.get("key"): definition
@@ -255,16 +294,16 @@ class Installer:
             local_installer = package.get("local_installer")
             if local_installer:
                 command = [local_installer["path"]]
-                install_source = "local_exe"
-            elif manager:
+                install_source = local_installer.get("source", "Local")
+            elif use_winget_fallback and manager:
                 command = self._build_definition_install_cmd(manager, definition)
-                install_source = manager
+                install_source = "winget"
             else:
                 results.append(
                     {
                         "key": key,
                         "status": "missing",
-                        "message": "No local installer found and no winget fallback available.",
+                        "message": "No local installer found. Winget fallback is disabled.",
                     }
                 )
                 continue
@@ -391,6 +430,15 @@ class Installer:
         return "Missing"
 
     @staticmethod
+    def _install_source(local_installer: Optional[Dict[str, str]]) -> str:
+        if not local_installer:
+            return "Missing"
+        source = local_installer.get("source", "Local")
+        if source in {"Local", "OneDrive", "USB"}:
+            return source
+        return "Local"
+
+    @staticmethod
     def _detection_source(
         registry_matches: List[Dict[str, str]],
         command_matches: List[Dict[str, Optional[str]]],
@@ -492,13 +540,19 @@ class Installer:
         return drives
 
     @staticmethod
-    def _dedupe(paths: List[str]) -> List[str]:
+    def _dedupe_locations(paths: List[Dict[str, str]]) -> List[Dict[str, str]]:
         seen = set()
         unique = []
-        for path in paths:
+        for location in paths:
+            path = location["path"]
             normalized = os.path.normcase(os.path.normpath(path))
             if normalized in seen:
                 continue
             seen.add(normalized)
-            unique.append(os.path.normpath(path))
+            unique.append(
+                {
+                    "source": location["source"],
+                    "path": os.path.normpath(path),
+                }
+            )
         return unique
