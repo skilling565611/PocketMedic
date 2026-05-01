@@ -140,8 +140,27 @@ class TerminalUI:
     def _print_report(report: dict) -> None:
         for section, data in report.items():
             print(f"\n  [{section.upper()}]")
-            if isinstance(data, dict):
-                for key, value in data.items():
-                    print(f"    {key}: {value}")
-            else:
-                print(f"    {data}")
+            TerminalUI._print_value(data, indent=4)
+
+    @staticmethod
+    def _print_value(value, indent: int) -> None:
+        prefix = " " * indent
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if isinstance(item, (dict, list)):
+                    print(f"{prefix}{key}:")
+                    TerminalUI._print_value(item, indent + 2)
+                else:
+                    print(f"{prefix}{key}: {item}")
+            return
+
+        if isinstance(value, list):
+            for item in value:
+                if isinstance(item, (dict, list)):
+                    print(f"{prefix}-")
+                    TerminalUI._print_value(item, indent + 2)
+                else:
+                    print(f"{prefix}- {item}")
+            return
+
+        print(f"{prefix}{value}")

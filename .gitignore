@@ -1,5 +1,6 @@
 # PocketMedic runtime files
 Logs/*.log
+Logs/scan_*.json
 Backups/
 PortableTools/*.exe
 PortableTools/*.zip
