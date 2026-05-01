@@ -1,0 +1,22 @@
+{
+    "profile_name": "ControlPrime",
+    "description": "Primary profile for Control Prime hardware target",
+    "hardware": {
+        "target": "ControlPrime",
+        "ram_gb": 16,
+        "storage_type": "NVMe"
+    },
+    "scan": {
+        "deep_scan": false,
+        "check_drivers": true,
+        "check_startup": true
+    },
+    "backup": {
+        "enabled": true,
+        "destinations": ["OneDrive"]
+    },
+    "network": {
+        "check_connectivity": true,
+        "preferred_dns": ["8.8.8.8", "1.1.1.1"]
+    }
+}

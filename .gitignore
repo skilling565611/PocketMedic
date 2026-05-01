@@ -1,3 +1,9 @@
+# PocketMedic runtime files
+Logs/*.log
+Backups/
+PortableTools/*.exe
+PortableTools/*.zip
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
