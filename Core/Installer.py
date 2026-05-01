@@ -7,9 +7,10 @@ import subprocess
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from Core.Paths import resolve_resource
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_DEFINITIONS_PATH = os.path.join(PROJECT_ROOT, "Config", "Package.Definitions.json")
+
+DEFAULT_DEFINITIONS_PATH = resolve_resource(os.path.join("Config", "Package.Definitions.json"))
 
 
 class Installer:
@@ -309,9 +310,7 @@ class Installer:
 
     @staticmethod
     def _resolve(path: str) -> str:
-        if os.path.isabs(path):
-            return path
-        return os.path.join(PROJECT_ROOT, path)
+        return resolve_resource(path)
 
     @staticmethod
     def _expand_path(path: str) -> str:

@@ -3,8 +3,11 @@
 import os
 import sys
 
-PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, PROJECT_ROOT)
+if getattr(sys, "frozen", False):
+    RUNTIME_ROOT = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+else:
+    RUNTIME_ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, RUNTIME_ROOT)
 
 from Core.Logger import Logger
 from GUI.TerminalUI import TerminalUI

@@ -10,15 +10,15 @@ import shutil
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from Core.Paths import app_root, resolve_app, resolve_resource
+
 
 class Storage:
     """Manage persistent configuration and data files."""
 
     def __init__(self, base_dir: Optional[str] = None, logger=None):
         self._logger = logger
-        self.base_dir = base_dir or os.path.dirname(
-            os.path.dirname(os.path.abspath(__file__))
-        )
+        self.base_dir = base_dir or app_root()
 
     # ------------------------------------------------------------------
     # JSON helpers
@@ -26,7 +26,7 @@ class Storage:
 
     def load_json(self, path: str) -> Dict[str, Any]:
         """Load and return a JSON file, or an empty dict on error."""
-        full_path = self._resolve(path)
+        full_path = self._resolve_read(path)
         try:
             with open(full_path, "r", encoding="utf-8") as file_handle:
                 data = json.load(file_handle)
@@ -39,7 +39,9 @@ class Storage:
     def save_json(self, path: str, data: Dict[str, Any]) -> bool:
         """Serialize data to a JSON file."""
         full_path = self._resolve(path)
-        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        destination_dir = os.path.dirname(full_path)
+        if destination_dir:
+            os.makedirs(destination_dir, exist_ok=True)
         try:
             with open(full_path, "w", encoding="utf-8") as file_handle:
                 json.dump(data, file_handle, indent=4)
@@ -137,6 +139,16 @@ class Storage:
         if os.path.isabs(path):
             return path
         return os.path.join(self.base_dir, path)
+
+    def _resolve_read(self, path: str) -> str:
+        """Resolve read paths against bundled resources before writable app files."""
+        if os.path.isabs(path):
+            return path
+
+        resource_candidate = resolve_resource(path)
+        if os.path.exists(resource_candidate):
+            return resource_candidate
+        return resolve_app(path)
 
     def _write_offload_manifest(self, source_path: str, target_path: str) -> str:
         manifest_path = os.path.join(os.path.dirname(target_path), "offload_manifest.json")

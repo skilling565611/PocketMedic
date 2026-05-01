@@ -4,9 +4,10 @@ import logging
 import os
 from datetime import datetime
 
+from Core.Paths import app_path
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-LOG_DIR = os.path.join(PROJECT_ROOT, "Logs")
+
+LOG_DIR = app_path("Logs")
 
 
 class Logger:

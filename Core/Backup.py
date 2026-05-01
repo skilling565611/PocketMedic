@@ -8,8 +8,7 @@ import zipfile
 from datetime import datetime
 from typing import List, Optional
 
-
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+from Core.Paths import app_path
 
 
 class Backup:
@@ -17,7 +16,7 @@ class Backup:
 
     def __init__(self, backup_dir: Optional[str] = None, logger=None):
         self._logger = logger
-        self.backup_dir = backup_dir or os.path.join(PROJECT_ROOT, "Backups")
+        self.backup_dir = backup_dir or app_path("Backups")
         os.makedirs(self.backup_dir, exist_ok=True)
 
     # ------------------------------------------------------------------

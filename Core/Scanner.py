@@ -8,10 +8,11 @@ import shutil
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from Core.Paths import app_path, resource_path
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CONFIG_DIR = os.path.join(PROJECT_ROOT, "Config")
-LOG_DIR = os.path.join(PROJECT_ROOT, "Logs")
+
+CONFIG_DIR = resource_path("Config")
+LOG_DIR = app_path("Logs")
 DEFAULT_LOW_STORAGE_FREE_GB = 20
 DEFAULT_LOW_STORAGE_FREE_PERCENT = 10
 
