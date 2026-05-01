@@ -5,8 +5,8 @@ import os
 import platform
 from typing import Any, Dict, List
 
+from Core.ConfigManager import ConfigManager
 from Core.Paths import app_path
-from Core.Storage import Storage
 
 
 class BuildInfo:
@@ -14,13 +14,13 @@ class BuildInfo:
 
     def __init__(self, logger=None):
         self._logger = logger
-        self._storage = Storage(logger=logger)
+        self._config = ConfigManager(logger=logger)
 
     def report(self) -> Dict[str, Any]:
         """Return version, build, and V3.1 prep status."""
-        settings = self._storage.load_json("Config/Global.Settings.json")
+        settings = self._config.load_settings()
         metadata_path = settings.get("build_metadata_path", "Config/Build.Metadata.json")
-        metadata = self._storage.load_json(metadata_path)
+        metadata = self._config._load_internal_json(metadata_path)
         version = metadata.get("version") or settings.get("version", "unknown")
 
         return {
@@ -49,6 +49,7 @@ class BuildInfo:
                 "goldenboy_detection": self.detect_goldenboy_usb(),
                 "metadata": metadata.get("v3_1_prep", {}),
             },
+            "config_sources": self._config.loaded_sources,
         }
 
     def detect_goldenboy_usb(self) -> Dict[str, Any]:

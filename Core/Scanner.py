@@ -8,6 +8,7 @@ import shutil
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from Core.ConfigManager import ConfigManager
 from Core.Paths import app_path, resource_path
 
 
@@ -126,7 +127,7 @@ class Scanner:
 
     def detect_machine_profile(self) -> Dict[str, Any]:
         """Detect the active and likely matching machine profile."""
-        settings = self._load_json(os.path.join(CONFIG_DIR, "Global.Settings.json"))
+        settings = ConfigManager(logger=self._logger).load_settings()
         active_profile = settings.get("active_profile")
         machine_name = platform.node()
         profiles = self._load_profiles()

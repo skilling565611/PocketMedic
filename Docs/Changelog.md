@@ -14,6 +14,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Terminal UI and Tkinter dashboard scaffolds
 - Config profiles for ArcticPrime and ControlPrime
 - Documentation and runtime folders
+- Hybrid internal/external config support with `PocketMedic_Data`
+- External package, user settings, and machine override files
 
 ### Changed
 - V3.1 installer behavior now accepts only local, OneDrive, and USB installer EXE sources

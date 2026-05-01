@@ -1,6 +1,5 @@
 """Software installation engine for PocketMedic."""
 
-import json
 import os
 import shutil
 import subprocess
@@ -8,10 +7,11 @@ import ctypes
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from Core.ConfigManager import ConfigManager
 from Core.Paths import app_path, find_resource
 
 
-DEFAULT_DEFINITIONS_PATH = find_resource(os.path.join("Config", "Package.Definitions.json"))
+DEFAULT_DEFINITIONS_PATH = os.path.join("Config", "Package.Definitions.json")
 
 
 class Installer:
@@ -26,20 +26,9 @@ class Installer:
 
     def load_package_definitions(self, path: Optional[str] = None) -> List[Dict[str, Any]]:
         """Load package definitions from JSON config."""
-        definitions_path = self._resolve(path or DEFAULT_DEFINITIONS_PATH)
-        try:
-            with open(definitions_path, "r", encoding="utf-8") as file_handle:
-                data = json.load(file_handle)
-        except (FileNotFoundError, json.JSONDecodeError) as exc:
-            self._warning(f"Warning: failed to load package definitions {definitions_path!r}: {exc}")
-            return []
-
-        packages = data.get("packages", [])
-        if not isinstance(packages, list):
-            self._warning(f"Warning: package definitions must be a list: {definitions_path}")
-            return []
-
-        self._log(f"Loaded {len(packages)} package definitions from {definitions_path}")
+        definitions_path = path or DEFAULT_DEFINITIONS_PATH
+        packages = ConfigManager(logger=self._logger).load_package_definitions(definitions_path)
+        self._log(f"Loaded {len(packages)} merged package definitions.")
         return packages
 
     def manager_status(self) -> Dict[str, object]:
@@ -145,6 +134,7 @@ class Installer:
             "manager_status": manager_status,
             "use_winget_fallback": False,
             "installer_policy": "EXE-only",
+            "installer_search_paths": self.get_installer_search_paths(),
             "manual_confirmation_required": True,
             "packages": packages,
             "missing_count": len(missing),

@@ -43,6 +43,16 @@ pip install psutil
 
 Package definitions live in `Config/Package.Definitions.json`.
 
+PocketMedic also supports external user-editable config beside the EXE/source
+folder under `PocketMedic_Data/`:
+
+- `ExtraPackages.json` extends or overrides bundled package definitions
+- `UserSettings.json` overrides global settings
+- `MachineOverrides.json` applies default or per-machine overrides
+
+Missing external files are allowed. PocketMedic logs which config sources were
+loaded and continues with bundled defaults.
+
 PocketMedic 3.1.0 detects installed apps from:
 
 - Windows uninstall registry entries
@@ -80,7 +90,8 @@ Scripts\Build-PocketMedic.ps1 -Clean
 
 The spec bundles `Config/*.json`. At runtime, PocketMedic loads bundled config
 from `sys._MEIPASS` in onefile EXEs and falls back to the project `Config/`
-folder when running from source.
+folder when running from source. External `PocketMedic_Data` files beside the
+EXE can override defaults without rebuilding.
 
 ## Profiles
 

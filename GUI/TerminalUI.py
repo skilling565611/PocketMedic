@@ -143,14 +143,14 @@ class TerminalUI:
         self._print_rebuild_summary(report)
 
     def _action_utilities(self) -> None:
+        from Core.ConfigManager import ConfigManager
         from Core.Installer import Installer
         from Core.Network import Network
         from Core.OneDrive import OneDrive
         from Core.Startup import Startup
-        from Core.Storage import Storage
 
-        storage = Storage(logger=self._logger)
-        settings = storage.load_json("Config/Global.Settings.json")
+        config = ConfigManager(logger=self._logger)
+        settings = config.load_settings()
         definitions_path = settings.get(
             "package_definitions_path",
             "Config/Package.Definitions.json",
@@ -177,9 +177,10 @@ class TerminalUI:
         report = {
             "installer_engine": {
                 "install_plan": installer.build_install_plan(
-                    installer.load_package_definitions(definitions_path),
+                    config.load_package_definitions(definitions_path),
                     use_winget_fallback=use_winget_fallback,
                 ),
+                "config_sources": config.loaded_sources,
             },
             "onedrive_integration": onedrive_status,
             "storage_offload_system": {
@@ -207,18 +208,18 @@ class TerminalUI:
         self._print_report(report)
 
     def _action_app_installer(self) -> None:
+        from Core.ConfigManager import ConfigManager
         from Core.Installer import Installer
-        from Core.Storage import Storage
 
-        storage = Storage(logger=self._logger)
-        settings = storage.load_json("Config/Global.Settings.json")
+        config = ConfigManager(logger=self._logger)
+        settings = config.load_settings()
         definitions_path = settings.get(
             "package_definitions_path",
             "Config/Package.Definitions.json",
         )
         use_winget_fallback = settings.get("use_winget_fallback", False)
         installer = Installer(logger=self._logger)
-        definitions = installer.load_package_definitions(definitions_path)
+        definitions = config.load_package_definitions(definitions_path)
         if not definitions:
             print("\n  -- App Installer Framework --")
             print(f"\n  Warning: no package definitions found at {definitions_path!r}.")
@@ -231,6 +232,7 @@ class TerminalUI:
         )
 
         print("\n  -- App Installer Framework --")
+        self._print_config_sources(config.loaded_sources)
         self._print_install_plan(plan)
 
         if plan.get("actionable_count", 0) == 0:
@@ -302,6 +304,15 @@ class TerminalUI:
         for section, data in report.items():
             print(f"\n  [{section.upper()}]")
             TerminalUI._print_value(data, indent=4)
+
+    @staticmethod
+    def _print_config_sources(sources: list) -> None:
+        print("\n  Config sources loaded:")
+        if not sources:
+            print("    (none)")
+            return
+        for source in sources:
+            print(f"    - {source}")
 
     @staticmethod
     def _print_install_plan(plan: dict) -> None:
