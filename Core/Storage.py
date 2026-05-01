@@ -7,7 +7,8 @@ filesystem helpers.
 import json
 import os
 import shutil
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 class Storage:
@@ -61,12 +62,60 @@ class Storage:
     def copy_file(self, src: str, dst: str) -> bool:
         """Copy a file and return True on success."""
         try:
+            destination_dir = os.path.dirname(dst)
+            if destination_dir:
+                os.makedirs(destination_dir, exist_ok=True)
             shutil.copy2(src, dst)
             self._log(f"Copied {src!r} -> {dst!r}")
             return True
         except OSError as exc:
             self._log(f"Copy failed: {exc}")
             return False
+
+    def offload_path(self, src: str, destination_dir: str) -> Dict[str, Any]:
+        """Copy a file or directory to a destination and write a manifest."""
+        source_path = self._resolve(src)
+        destination_path = self._resolve(destination_dir)
+        if not os.path.exists(source_path):
+            return {
+                "success": False,
+                "source": source_path,
+                "destination": destination_path,
+                "message": "Source path not found.",
+            }
+
+        os.makedirs(destination_path, exist_ok=True)
+        target_path = os.path.join(destination_path, os.path.basename(source_path))
+        try:
+            if os.path.isdir(source_path):
+                shutil.copytree(source_path, target_path, dirs_exist_ok=True)
+            else:
+                shutil.copy2(source_path, target_path)
+
+            manifest = self._write_offload_manifest(source_path, target_path)
+            self._log(f"Offloaded {source_path!r} -> {target_path!r}")
+            return {
+                "success": True,
+                "source": source_path,
+                "destination": target_path,
+                "manifest": manifest,
+                "message": "Offload complete.",
+            }
+        except OSError as exc:
+            self._log(f"Offload failed: {exc}")
+            return {
+                "success": False,
+                "source": source_path,
+                "destination": target_path,
+                "message": str(exc),
+            }
+
+    def list_offloads(self, destination_dir: str) -> List[str]:
+        """Return files and folders currently present in an offload destination."""
+        destination_path = self._resolve(destination_dir)
+        if not os.path.isdir(destination_path):
+            return []
+        return sorted(os.path.join(destination_path, item) for item in os.listdir(destination_path))
 
     def delete_file(self, path: str) -> bool:
         """Delete a file and return True on success."""
@@ -88,6 +137,18 @@ class Storage:
         if os.path.isabs(path):
             return path
         return os.path.join(self.base_dir, path)
+
+    def _write_offload_manifest(self, source_path: str, target_path: str) -> str:
+        manifest_path = os.path.join(os.path.dirname(target_path), "offload_manifest.json")
+        manifest = {
+            "timestamp": datetime.now().isoformat(timespec="seconds"),
+            "source": source_path,
+            "destination": target_path,
+            "source_type": "directory" if os.path.isdir(source_path) else "file",
+        }
+        with open(manifest_path, "w", encoding="utf-8") as file_handle:
+            json.dump(manifest, file_handle, indent=4)
+        return manifest_path
 
     def _log(self, message: str) -> None:
         if self._logger:

@@ -4,7 +4,6 @@ The assistant verifies rebuild readiness and prepares next-step hooks without
 making destructive changes to the machine.
 """
 
-import os
 import platform
 import shutil
 from dataclasses import dataclass
@@ -120,18 +119,12 @@ class RebuildAssistant:
 
     def detect_onedrive(self) -> Dict[str, Any]:
         """Detect whether a local OneDrive path is ready for rebuild backups."""
-        detected = self._onedrive.detect()
-        root = self._onedrive.root
+        status = self._onedrive.status()
+        detected = status["detected"]
         return {
             "status": "pass" if detected else "warning",
             "message": "OneDrive backup path detected." if detected else "OneDrive path not detected.",
-            "details": {
-                "detected": detected,
-                "root": root,
-                "recommended_backup_folder": (
-                    os.path.join(root, "PocketMedic", "RebuildBackups") if root else None
-                ),
-            },
+            "details": status,
         }
 
     def validate_network(self) -> Dict[str, Any]:
@@ -184,26 +177,19 @@ class RebuildAssistant:
 
     def prepare_packages(self) -> Dict[str, Any]:
         """Prepare package installer hooks without installing packages."""
-        manager = self._detect_package_manager()
-        package_hooks = []
-        for package in DEFAULT_PACKAGES:
-            package_hooks.append(
-                {
-                    "package": package,
-                    "installed": self._installer.is_installed(package),
-                    "install_command": self._build_install_preview(manager, package),
-                }
-            )
+        manager_status = self._installer.manager_status()
+        manager = manager_status["active_manager"]
+        package_hooks = self._installer.verify_packages(DEFAULT_PACKAGES)
 
         return {
-            "status": "pass" if manager else "warning",
+            "status": "pass" if manager_status["ready"] else "warning",
             "message": (
                 f"Package manager hook ready: {manager}."
                 if manager
                 else "No supported package manager found for installer hooks."
             ),
             "details": {
-                "manager": manager,
+                "manager_status": manager_status,
                 "safe_mode": "Commands are prepared only; no packages were installed.",
                 "packages": package_hooks,
             },
@@ -212,26 +198,6 @@ class RebuildAssistant:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _detect_package_manager() -> str:
-        for manager in ("winget", "choco", "apt", "brew"):
-            if shutil.which(manager):
-                return manager
-        return ""
-
-    @staticmethod
-    def _build_install_preview(manager: str, package: str) -> str:
-        if not manager:
-            return ""
-
-        mapping = {
-            "winget": f"winget install --silent {package}",
-            "choco": f"choco install -y {package}",
-            "apt": f"apt-get install -y {package}",
-            "brew": f"brew install {package}",
-        }
-        return mapping.get(manager, f"{manager} install {package}")
 
     @staticmethod
     def _summarize(results: List[Dict[str, Any]]) -> Dict[str, Any]:

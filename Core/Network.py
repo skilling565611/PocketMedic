@@ -65,7 +65,85 @@ class Network:
             "connectivity": self.check_connectivity(),
             "dns": self.check_dns(),
             "ping_results": {host: self.ping(host) for host in target_hosts},
+            "network_drives": self.list_network_drives(),
         }
+
+    def list_network_drives(self) -> List[Dict[str, str]]:
+        """List mapped network drives on Windows."""
+        if platform.system() != "Windows":
+            return []
+
+        try:
+            result = subprocess.run(
+                ["net", "use"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+            self._log(f"Network drive listing failed: {exc}")
+            return []
+
+        drives = []
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 3 and parts[1].endswith(":"):
+                drives.append(
+                    {
+                        "status": parts[0],
+                        "drive": parts[1],
+                        "remote": parts[2],
+                    }
+                )
+        return drives
+
+    def reconnect_network_drive(
+        self,
+        drive_letter: str,
+        remote_path: str,
+        persistent: bool = True,
+        dry_run: bool = True,
+    ) -> Dict[str, object]:
+        """Reconnect a Windows network drive, or preview the command in dry-run mode."""
+        drive = drive_letter.rstrip(":") + ":"
+        command = [
+            "net",
+            "use",
+            drive,
+            remote_path,
+            f"/persistent:{'yes' if persistent else 'no'}",
+        ]
+        if platform.system() != "Windows":
+            return {
+                "success": False,
+                "dry_run": dry_run,
+                "command": " ".join(command),
+                "message": "Network drive reconnect is Windows-only.",
+            }
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "command": " ".join(command),
+                "message": "Reconnect command prepared.",
+            }
+
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=20)
+            success = result.returncode == 0
+            return {
+                "success": success,
+                "dry_run": False,
+                "command": " ".join(command),
+                "message": result.stdout.strip() if success else result.stderr.strip(),
+            }
+        except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+            return {
+                "success": False,
+                "dry_run": False,
+                "command": " ".join(command),
+                "message": str(exc),
+            }
 
     # ------------------------------------------------------------------
     # Internal helpers

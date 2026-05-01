@@ -5,6 +5,8 @@ startup items, check network health, and more, all without a graphical
 desktop environment.
 """
 
+import os
+
 
 class TerminalUI:
     """Simple menu-driven CLI interface."""
@@ -16,6 +18,7 @@ class TerminalUI:
         ("4", "Startup Manager", "startup"),
         ("5", "Backup", "backup"),
         ("6", "Rebuild Assistant", "rebuild"),
+        ("7", "Maintenance Utilities", "utilities"),
         ("Q", "Quit", "quit"),
     ]
 
@@ -137,6 +140,64 @@ class TerminalUI:
         print("\n  -- PocketMedic V2.1 Rebuild Assistant --")
         self._print_rebuild_summary(report)
 
+    def _action_utilities(self) -> None:
+        from Core.Installer import Installer
+        from Core.Network import Network
+        from Core.OneDrive import OneDrive
+        from Core.Startup import Startup
+        from Core.Storage import Storage
+
+        storage = Storage(logger=self._logger)
+        settings = storage.load_json("Config/Global.Settings.json")
+        installer_packages = settings.get("installer_packages", [])
+        startup_delay = settings.get("startup_delay_seconds", 30)
+        offload_relative = settings.get("storage_offload", {}).get(
+            "default_relative_path",
+            "PocketMedic/Offload",
+        )
+
+        installer = Installer(logger=self._logger)
+        onedrive = OneDrive(logger=self._logger)
+        network = Network(logger=self._logger)
+        startup = Startup(logger=self._logger)
+
+        onedrive_status = onedrive.status()
+        offload_destination = None
+        if onedrive_status.get("root"):
+            offload_destination = os.path.normpath(
+                os.path.join(onedrive_status["root"], offload_relative)
+            )
+
+        report = {
+            "installer_engine": {
+                "manager_status": installer.manager_status(),
+                "packages": installer.verify_packages(installer_packages),
+            },
+            "onedrive_integration": onedrive_status,
+            "storage_offload_system": {
+                "default_destination": offload_destination,
+                "existing_items": (
+                    storage.list_offloads(offload_destination)
+                    if offload_destination and os.path.isdir(offload_destination)
+                    else []
+                ),
+                "safe_mode": "Path is previewed only; offload methods create folders when called.",
+            },
+            "network_drive_reconnect": {
+                "mapped_drives": network.list_network_drives(),
+                "configured_drives": settings.get("network_drives", []),
+                "safe_mode": "Reconnect commands are previewed until dry_run is disabled.",
+            },
+            "startup_delay_manager": {
+                "delay_seconds": startup_delay,
+                "planned_entries": startup.build_delay_plan(delay_seconds=startup_delay),
+                "safe_mode": "Scheduled tasks are previewed until dry_run is disabled.",
+            },
+        }
+
+        print("\n  -- Maintenance Utilities --")
+        self._print_report(report)
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
@@ -177,6 +238,9 @@ class TerminalUI:
     def _print_value(value, indent: int) -> None:
         prefix = " " * indent
         if isinstance(value, dict):
+            if not value:
+                print(f"{prefix}(none)")
+                return
             for key, item in value.items():
                 if isinstance(item, (dict, list)):
                     print(f"{prefix}{key}:")
@@ -186,6 +250,9 @@ class TerminalUI:
             return
 
         if isinstance(value, list):
+            if not value:
+                print(f"{prefix}(none)")
+                return
             for item in value:
                 if isinstance(item, (dict, list)):
                     print(f"{prefix}-")

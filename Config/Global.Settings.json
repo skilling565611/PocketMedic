@@ -7,6 +7,15 @@
     "scripts_dir": "Scripts",
     "backup_enabled": true,
     "onedrive_sync_enabled": false,
+    "installer_packages": [
+        "python",
+        "git"
+    ],
+    "network_drives": [],
+    "storage_offload": {
+        "default_relative_path": "PocketMedic/Offload"
+    },
+    "startup_delay_seconds": 30,
     "theme": "default",
     "active_profile": "ArcticPrime"
 }

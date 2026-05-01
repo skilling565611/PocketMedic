@@ -6,7 +6,7 @@ Detects the local OneDrive folder and copies files into it when available.
 import os
 import platform
 import shutil
-from typing import Optional
+from typing import Dict, Optional
 
 
 class OneDrive:
@@ -24,6 +24,22 @@ class OneDrive:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def status(self) -> Dict[str, object]:
+        """Return OneDrive detection status and useful PocketMedic paths."""
+        detected = self.detect()
+        return {
+            "detected": detected,
+            "root": self._root,
+            "offload_root": (
+                os.path.join(self._root, "PocketMedic", "Offload") if self._root else None
+            ),
+            "rebuild_backup_root": (
+                os.path.join(self._root, "PocketMedic", "RebuildBackups")
+                if self._root
+                else None
+            ),
+        }
 
     def detect(self) -> bool:
         """Try to locate the local OneDrive folder."""
@@ -70,6 +86,26 @@ class OneDrive:
         except OSError as exc:
             self._log(f"Failed to copy to OneDrive: {exc}")
             return False
+
+    def ensure_folder(self, relative_path: str) -> Optional[str]:
+        """Create and return a folder inside OneDrive when available."""
+        if not self.is_available() and not self.detect():
+            return None
+
+        folder_path = os.path.normpath(os.path.join(self._root, relative_path))
+        os.makedirs(folder_path, exist_ok=True)
+        self._log(f"OneDrive folder ready: {folder_path}")
+        return folder_path
+
+    def offload_file(self, src: str, relative_folder: str = "PocketMedic/Offload") -> bool:
+        """Copy a file into the configured OneDrive offload folder."""
+        if not os.path.isfile(src):
+            self._log(f"Offload source file not found: {src!r}")
+            return False
+
+        filename = os.path.basename(src)
+        relative_dest = os.path.join(relative_folder, filename)
+        return self.copy_to_onedrive(src, relative_dest)
 
     # ------------------------------------------------------------------
     # Internal helpers

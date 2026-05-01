@@ -6,6 +6,7 @@ Linux it checks common per-user startup folders.
 
 import os
 import platform
+import subprocess
 from typing import Dict, List
 
 
@@ -31,6 +32,70 @@ class Startup:
 
         self._log(f"Startup listing not supported on {system!r}.")
         return []
+
+    def build_delay_plan(self, delay_seconds: int = 30) -> List[Dict[str, object]]:
+        """Return a safe startup-delay plan for detected startup entries."""
+        return [
+            {
+                "name": entry["name"],
+                "path": entry["path"],
+                "delay_seconds": delay_seconds,
+                "status": "planned",
+            }
+            for entry in self.list_entries()
+        ]
+
+    def create_delayed_task(
+        self,
+        name: str,
+        command: str,
+        delay_seconds: int = 30,
+        dry_run: bool = True,
+    ) -> Dict[str, object]:
+        """Create or preview a delayed Windows startup scheduled task."""
+        task_name = f"PocketMedic_Delayed_{name}"
+        schtasks_command = [
+            "schtasks",
+            "/Create",
+            "/F",
+            "/SC",
+            "ONLOGON",
+            "/TN",
+            task_name,
+            "/TR",
+            f'powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds {delay_seconds}; {command}"',
+        ]
+        if platform.system() != "Windows":
+            return {
+                "success": False,
+                "dry_run": dry_run,
+                "command": " ".join(schtasks_command),
+                "message": "Startup delay tasks are Windows-only.",
+            }
+        if dry_run:
+            return {
+                "success": True,
+                "dry_run": True,
+                "command": " ".join(schtasks_command),
+                "message": "Delayed startup task command prepared.",
+            }
+
+        try:
+            result = subprocess.run(schtasks_command, capture_output=True, text=True, timeout=20)
+            success = result.returncode == 0
+            return {
+                "success": success,
+                "dry_run": False,
+                "command": " ".join(schtasks_command),
+                "message": result.stdout.strip() if success else result.stderr.strip(),
+            }
+        except (subprocess.TimeoutExpired, FileNotFoundError) as exc:
+            return {
+                "success": False,
+                "dry_run": False,
+                "command": " ".join(schtasks_command),
+                "message": str(exc),
+            }
 
     # ------------------------------------------------------------------
     # Platform-specific implementations
