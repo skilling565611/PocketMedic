@@ -4,13 +4,14 @@ import json
 import os
 import shutil
 import subprocess
+import ctypes
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from Core.Paths import resolve_resource
+from Core.Paths import app_path, find_resource
 
 
-DEFAULT_DEFINITIONS_PATH = resolve_resource(os.path.join("Config", "Package.Definitions.json"))
+DEFAULT_DEFINITIONS_PATH = find_resource(os.path.join("Config", "Package.Definitions.json"))
 
 
 class Installer:
@@ -30,12 +31,12 @@ class Installer:
             with open(definitions_path, "r", encoding="utf-8") as file_handle:
                 data = json.load(file_handle)
         except (FileNotFoundError, json.JSONDecodeError) as exc:
-            self._log(f"Failed to load package definitions {definitions_path!r}: {exc}")
+            self._warning(f"Warning: failed to load package definitions {definitions_path!r}: {exc}")
             return []
 
         packages = data.get("packages", [])
         if not isinstance(packages, list):
-            self._log(f"Package definitions must be a list: {definitions_path}")
+            self._warning(f"Warning: package definitions must be a list: {definitions_path}")
             return []
 
         self._log(f"Loaded {len(packages)} package definitions from {definitions_path}")
@@ -65,6 +66,7 @@ class Installer:
         detect = definition.get("detect", {})
         commands = detect.get("commands", [])
         paths = detect.get("paths", [])
+        registry_names = detect.get("registry_display_names", [])
 
         command_matches = [
             {"command": command, "path": shutil.which(command)}
@@ -77,12 +79,19 @@ class Installer:
             }
             for path in paths
         ]
-        installed = any(match["path"] for match in command_matches) or any(
-            match["exists"] for match in path_matches
+        registry_matches = self._find_registry_matches(
+            registry_names or [definition.get("display_name"), definition.get("key")]
+        )
+        installed = (
+            bool(registry_matches)
+            or any(match["path"] for match in command_matches)
+            or any(match["exists"] for match in path_matches)
         )
         self._log(f"detect_package({definition.get('key', 'unknown')!r}) -> {installed}")
         return {
             "installed": installed,
+            "source": self._detection_source(registry_matches, command_matches, path_matches),
+            "registry_matches": registry_matches,
             "command_matches": command_matches,
             "path_matches": path_matches,
         }
@@ -100,6 +109,8 @@ class Installer:
                 continue
 
             detection = self.detect_package(definition)
+            local_installer = self.find_local_installer(definition)
+            installer_status = self._installer_status(detection["installed"], local_installer)
             packages.append(
                 {
                     "key": definition.get("key"),
@@ -108,6 +119,8 @@ class Installer:
                     "enabled": definition.get("enabled", True),
                     "winget_id": definition.get("winget_id"),
                     "installed": detection["installed"],
+                    "installer_status": installer_status,
+                    "local_installer": local_installer,
                     "install_command": self.preview_definition_install(definition, manager),
                     "detection": detection,
                 }
@@ -132,6 +145,37 @@ class Installer:
         if resolved_manager is None:
             return ""
         return " ".join(self._build_definition_install_cmd(resolved_manager, definition))
+
+    def find_local_installer(self, definition: Dict[str, Any]) -> Optional[Dict[str, str]]:
+        """Find a local installer EXE for a package definition."""
+        patterns = definition.get("local_installers", [])
+        if not patterns:
+            key = definition.get("key", "")
+            patterns = [f"{key}.exe", f"{key}-*.exe", f"*{key}*.exe"]
+
+        for directory in self.get_installer_search_paths():
+            if not os.path.isdir(directory):
+                continue
+            for pattern in patterns:
+                match = self._first_match(directory, pattern)
+                if match:
+                    return {"path": match, "source": directory}
+        return None
+
+    def get_installer_search_paths(self) -> List[str]:
+        """Return local EXE installer search paths."""
+        paths = [app_path("Installers")]
+
+        onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
+        if not onedrive:
+            candidate = os.path.expanduser("~/OneDrive")
+            if os.path.isdir(candidate):
+                onedrive = candidate
+        if onedrive:
+            paths.append(os.path.join(onedrive, "PocketMedic", "Installers"))
+
+        paths.extend(os.path.join(drive, "Installers") for drive in self._removable_drives())
+        return self._dedupe(paths)
 
     def verify_packages(self, package_names: List[str]) -> List[Dict[str, object]]:
         """Return install status and install previews for requested packages."""
@@ -175,6 +219,7 @@ class Installer:
         self,
         plan: Dict[str, Any],
         confirmed: bool = False,
+        dry_run: bool = True,
     ) -> List[Dict[str, Any]]:
         """Install missing packages from a plan after explicit confirmation."""
         if not confirmed:
@@ -190,18 +235,6 @@ class Installer:
             ]
 
         manager = plan.get("manager_status", {}).get("active_manager")
-        if not manager:
-            self._log("Install skipped: no package manager available.")
-            return [
-                {
-                    "key": package.get("key"),
-                    "status": "failed",
-                    "message": "No package manager available.",
-                }
-                for package in plan.get("packages", [])
-                if not package.get("installed")
-            ]
-
         results = []
         definitions = {
             definition.get("key"): definition
@@ -219,12 +252,41 @@ class Installer:
                 )
                 continue
 
-            command = self._build_definition_install_cmd(manager, definition)
+            local_installer = package.get("local_installer")
+            if local_installer:
+                command = [local_installer["path"]]
+                install_source = "local_exe"
+            elif manager:
+                command = self._build_definition_install_cmd(manager, definition)
+                install_source = manager
+            else:
+                results.append(
+                    {
+                        "key": key,
+                        "status": "missing",
+                        "message": "No local installer found and no winget fallback available.",
+                    }
+                )
+                continue
+
+            if dry_run:
+                self._log(f"Dry-run install prepared for {key!r}: {' '.join(command)}")
+                results.append(
+                    {
+                        "key": key,
+                        "status": "dry_run",
+                        "source": install_source,
+                        "command": " ".join(command),
+                    }
+                )
+                continue
+
             success = self._run(command)
             results.append(
                 {
                     "key": key,
                     "status": "installed" if success else "failed",
+                    "source": install_source,
                     "command": " ".join(command),
                 }
             )
@@ -308,10 +370,135 @@ class Installer:
         if self._logger:
             self._logger.info(message)
 
+    def _warning(self, message: str) -> None:
+        if self._logger:
+            self._logger.warning(message)
+
     @staticmethod
     def _resolve(path: str) -> str:
-        return resolve_resource(path)
+        return find_resource(path)
 
     @staticmethod
     def _expand_path(path: str) -> str:
         return os.path.expandvars(os.path.expanduser(path))
+
+    @staticmethod
+    def _installer_status(installed: bool, local_installer: Optional[Dict[str, str]]) -> str:
+        if installed:
+            return "Installed"
+        if local_installer:
+            return "Available"
+        return "Missing"
+
+    @staticmethod
+    def _detection_source(
+        registry_matches: List[Dict[str, str]],
+        command_matches: List[Dict[str, Optional[str]]],
+        path_matches: List[Dict[str, object]],
+    ) -> str:
+        if registry_matches:
+            return "registry"
+        if any(match["path"] for match in command_matches):
+            return "executable"
+        if any(match["exists"] for match in path_matches):
+            return "known_path"
+        return "not_detected"
+
+    def _find_registry_matches(self, names: List[Optional[str]]) -> List[Dict[str, str]]:
+        if os.name != "nt":
+            return []
+
+        needles = [name.casefold() for name in names if name]
+        if not needles:
+            return []
+
+        matches = []
+        for entry in self._windows_uninstall_entries():
+            display_name = entry.get("display_name", "")
+            normalized = display_name.casefold()
+            if any(needle in normalized for needle in needles):
+                matches.append(entry)
+        return matches
+
+    @staticmethod
+    def _windows_uninstall_entries() -> List[Dict[str, str]]:
+        try:
+            import winreg  # type: ignore
+        except ImportError:
+            return []
+
+        hives = [
+            winreg.HKEY_CURRENT_USER,
+            winreg.HKEY_LOCAL_MACHINE,
+        ]
+        paths = [
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall",
+            r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+        ]
+        entries: List[Dict[str, str]] = []
+        for hive in hives:
+            for key_path in paths:
+                try:
+                    with winreg.OpenKey(hive, key_path) as root_key:
+                        index = 0
+                        while True:
+                            try:
+                                subkey_name = winreg.EnumKey(root_key, index)
+                                index += 1
+                            except OSError:
+                                break
+
+                            try:
+                                with winreg.OpenKey(root_key, subkey_name) as app_key:
+                                    display_name, _ = winreg.QueryValueEx(app_key, "DisplayName")
+                            except OSError:
+                                continue
+
+                            entry = {"display_name": str(display_name), "registry_key": subkey_name}
+                            try:
+                                version, _ = winreg.QueryValueEx(app_key, "DisplayVersion")
+                                entry["version"] = str(version)
+                            except OSError:
+                                pass
+                            entries.append(entry)
+                except OSError:
+                    continue
+        return entries
+
+    @staticmethod
+    def _first_match(directory: str, pattern: str) -> Optional[str]:
+        import glob
+
+        matches = sorted(glob.glob(os.path.join(directory, pattern)))
+        for match in matches:
+            if os.path.isfile(match) and match.lower().endswith(".exe"):
+                return match
+        return None
+
+    @staticmethod
+    def _removable_drives() -> List[str]:
+        if os.name != "nt":
+            return []
+
+        DRIVE_REMOVABLE = 2
+        drives = []
+        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+        for index in range(26):
+            if not bitmask & (1 << index):
+                continue
+            root = f"{chr(65 + index)}:\\"
+            if ctypes.windll.kernel32.GetDriveTypeW(root) == DRIVE_REMOVABLE:
+                drives.append(root)
+        return drives
+
+    @staticmethod
+    def _dedupe(paths: List[str]) -> List[str]:
+        seen = set()
+        unique = []
+        for path in paths:
+            normalized = os.path.normcase(os.path.normpath(path))
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            unique.append(os.path.normpath(path))
+        return unique

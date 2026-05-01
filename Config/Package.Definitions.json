@@ -6,7 +6,16 @@
             "enabled": true,
             "category": "runtime",
             "winget_id": "Python.Python.3.12",
+            "local_installers": [
+                "python-*.exe",
+                "python*.exe",
+                "Python*.exe"
+            ],
             "detect": {
+                "registry_display_names": [
+                    "Python",
+                    "Python Launcher"
+                ],
                 "commands": [
                     "python"
                 ],
@@ -19,7 +28,15 @@
             "enabled": true,
             "category": "developer_tools",
             "winget_id": "Git.Git",
+            "local_installers": [
+                "Git-*.exe",
+                "git-*.exe",
+                "Git*.exe"
+            ],
             "detect": {
+                "registry_display_names": [
+                    "Git"
+                ],
                 "commands": [
                     "git"
                 ],

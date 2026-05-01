@@ -20,6 +20,7 @@ class TerminalUI:
         ("6", "Rebuild Assistant", "rebuild"),
         ("7", "Maintenance Utilities", "utilities"),
         ("8", "App Installer", "app_installer"),
+        ("9", "Version / Build Info", "build_info"),
         ("Q", "Quit", "quit"),
     ]
 
@@ -213,9 +214,14 @@ class TerminalUI:
             "package_definitions_path",
             "Config/Package.Definitions.json",
         )
-
         installer = Installer(logger=self._logger)
         definitions = installer.load_package_definitions(definitions_path)
+        if not definitions:
+            print("\n  -- App Installer Framework --")
+            print(f"\n  Warning: no package definitions found at {definitions_path!r}.")
+            print("  Installer planning is unavailable until config is restored.")
+            return
+
         plan = installer.build_install_plan(definitions)
 
         print("\n  -- App Installer Framework --")
@@ -225,18 +231,35 @@ class TerminalUI:
             print("\n  All enabled packages are already detected.")
             return
 
-        print("\n  Type INSTALL to install missing enabled packages.")
+        print("\n  Type DRYRUN to preview missing installer commands.")
+        print("  Type RUN to execute missing installers.")
         print("  Press Enter to cancel without changes.")
         confirmation = input("  Confirm install: ").strip()
-        if confirmation != "INSTALL":
+        if confirmation == "DRYRUN":
+            results = installer.install_missing_from_plan(plan, confirmed=True, dry_run=True)
+            print("\n  Dry-run Results")
+            self._print_value(results, indent=4)
+            return
+
+        if confirmation != "RUN":
             results = installer.install_missing_from_plan(plan, confirmed=False)
             print("\n  Install canceled.")
             self._print_value(results, indent=4)
             return
 
-        results = installer.install_missing_from_plan(plan, confirmed=True)
+        results = installer.install_missing_from_plan(
+            plan,
+            confirmed=True,
+            dry_run=False,
+        )
         print("\n  Install Results")
         self._print_value(results, indent=4)
+
+    def _action_build_info(self) -> None:
+        from Core.BuildInfo import BuildInfo
+
+        print("\n  -- Version / Build Info --")
+        self._print_report(BuildInfo(logger=self._logger).report())
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -282,12 +305,18 @@ class TerminalUI:
         print("  Manual confirmation required: yes")
 
         for package in plan.get("packages", []):
-            status = "INSTALLED" if package.get("installed") else "MISSING"
+            status = package.get("installer_status", "Missing").upper()
             print(f"\n  [{status}] {package.get('display_name')}")
             print(f"    key: {package.get('key')}")
             print(f"    category: {package.get('category')}")
             print(f"    winget_id: {package.get('winget_id')}")
-            print(f"    command: {package.get('install_command') or '(none)'}")
+            local_installer = package.get("local_installer")
+            if local_installer:
+                print(f"    local_installer: {local_installer.get('path')}")
+            else:
+                print("    local_installer: (none)")
+            print(f"    winget_fallback: {package.get('install_command') or '(none)'}")
+            print(f"    detection_source: {package.get('detection', {}).get('source')}")
 
     @staticmethod
     def _print_value(value, indent: int) -> None:

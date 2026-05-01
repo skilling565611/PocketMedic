@@ -4,6 +4,10 @@ Logs/scan_*.json
 Backups/
 PortableTools/*.exe
 PortableTools/*.zip
+Installers/*.exe
+Installers/*.msi
+Installers/*.zip
+!Installers/README.md
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,6 +1,6 @@
 {
     "app_name": "PocketMedic",
-    "version": "0.1.0",
+    "version": "3.0.1",
     "log_level": "INFO",
     "log_dir": "Logs",
     "portable_tools_dir": "PortableTools",
@@ -12,6 +12,13 @@
         "git"
     ],
     "package_definitions_path": "Config/Package.Definitions.json",
+    "build_metadata_path": "Config/Build.Metadata.json",
+    "installer_dry_run_default": true,
+    "installer_cache": {
+        "local_dir": "Installers",
+        "onedrive_dir": "PocketMedic/Installers",
+        "usb_dir": "Installers"
+    },
     "network_drives": [],
     "storage_offload": {
         "default_relative_path": "PocketMedic/Offload"

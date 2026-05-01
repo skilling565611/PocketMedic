@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from Core.Paths import app_root, resolve_app, resolve_resource
+from Core.Paths import app_root, find_resource, resolve_app
 
 
 class Storage:
@@ -33,7 +33,7 @@ class Storage:
             self._log(f"Loaded JSON: {full_path}")
             return data
         except (FileNotFoundError, json.JSONDecodeError) as exc:
-            self._log(f"Failed to load JSON {full_path!r}: {exc}")
+            self._warning(f"Warning: failed to load JSON {full_path!r}: {exc}")
             return {}
 
     def save_json(self, path: str, data: Dict[str, Any]) -> bool:
@@ -145,7 +145,7 @@ class Storage:
         if os.path.isabs(path):
             return path
 
-        resource_candidate = resolve_resource(path)
+        resource_candidate = find_resource(path)
         if os.path.exists(resource_candidate):
             return resource_candidate
         return resolve_app(path)
@@ -165,3 +165,7 @@ class Storage:
     def _log(self, message: str) -> None:
         if self._logger:
             self._logger.info(message)
+
+    def _warning(self, message: str) -> None:
+        if self._logger:
+            self._logger.warning(message)

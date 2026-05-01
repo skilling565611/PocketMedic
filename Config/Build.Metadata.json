@@ -1,0 +1,18 @@
+{
+    "version": "3.0.1",
+    "channel": "stable",
+    "build_name": "PocketMedic 3.0.1",
+    "icon_path": "Assets/PocketMedic.ico",
+    "pyinstaller_spec": "PocketMedic.spec",
+    "installer_cache": {
+        "local_dir": "Installers",
+        "onedrive_dir": "PocketMedic/Installers",
+        "usb_dir": "Installers"
+    },
+    "v3_1_prep": {
+        "goldenboy_detection": true,
+        "usb_installer_cache": true,
+        "build_metadata": true,
+        "icon_packaging": "prepared"
+    }
+}

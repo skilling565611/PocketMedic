@@ -45,6 +45,22 @@ def resolve_resource(path: str) -> str:
     return resource_path(path)
 
 
+def find_resource(path: str) -> str:
+    """Find a resource path, falling back to source config when needed."""
+    if os.path.isabs(path):
+        return path
+
+    bundled_path = resource_path(path)
+    if os.path.exists(bundled_path):
+        return bundled_path
+
+    source_path = os.path.join(project_root(), path)
+    if os.path.exists(source_path):
+        return source_path
+
+    return bundled_path
+
+
 def resolve_app(path: str) -> str:
     """Resolve relative paths against the writable application root."""
     if os.path.isabs(path):
