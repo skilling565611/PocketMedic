@@ -1,12 +1,8 @@
-"""
-GUI/Dashboard.py — Graphical dashboard for PocketMedic.
+"""Graphical dashboard for PocketMedic.
 
-Provides a Tkinter-based GUI dashboard that surfaces the same features as
-the TerminalUI in a windowed interface.  Falls back gracefully if Tkinter
-is not available.
+Provides a Tkinter-based GUI dashboard that surfaces the same features as the
+terminal UI.
 """
-
-import sys
 
 
 def _tkinter_available() -> bool:
@@ -18,11 +14,12 @@ def _tkinter_available() -> bool:
 
 
 class Dashboard:
-    """Tkinter GUI dashboard.  Gracefully degrades if Tkinter is absent."""
+    """Tkinter GUI dashboard with a graceful no-Tkinter fallback."""
 
     def __init__(self, logger=None):
         self._logger = logger
         self._root = None
+        self._output = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -31,8 +28,8 @@ class Dashboard:
     def run(self) -> None:
         """Launch the GUI dashboard."""
         if not _tkinter_available():
-            self._log("Tkinter is not available — cannot launch Dashboard.")
-            print("Dashboard requires Tkinter. Please use the TerminalUI instead.")
+            self._log("Tkinter is not available; cannot launch Dashboard.")
+            print("Dashboard requires Tkinter. Please use the terminal UI instead.")
             return
 
         self._build()
@@ -51,7 +48,6 @@ class Dashboard:
         self._root.geometry("640x480")
         self._root.resizable(True, True)
 
-        # Header
         header = tk.Label(
             self._root,
             text="PocketMedic",
@@ -69,23 +65,21 @@ class Dashboard:
 
         ttk.Separator(self._root, orient="horizontal").pack(fill=tk.X, pady=8)
 
-        # Action buttons
-        btn_frame = tk.Frame(self._root)
-        btn_frame.pack(pady=10)
+        button_frame = tk.Frame(self._root)
+        button_frame.pack(pady=10)
 
         buttons = [
-            ("System Scan",         self._on_scan),
-            ("Hardware Report",     self._on_hardware),
+            ("System Scan", self._on_scan),
+            ("Hardware Report", self._on_hardware),
             ("Network Diagnostics", self._on_network),
-            ("Startup Manager",     self._on_startup),
-            ("Backup",              self._on_backup),
+            ("Startup Manager", self._on_startup),
+            ("Backup", self._on_backup),
         ]
 
-        for text, cmd in buttons:
-            btn = ttk.Button(btn_frame, text=text, command=cmd, width=24)
-            btn.pack(pady=4)
+        for text, command in buttons:
+            button = ttk.Button(button_frame, text=text, command=command, width=24)
+            button.pack(pady=4)
 
-        # Output area
         ttk.Separator(self._root, orient="horizontal").pack(fill=tk.X, pady=8)
         self._output = tk.Text(self._root, height=12, state=tk.DISABLED, wrap=tk.WORD)
         self._output.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
@@ -96,36 +90,50 @@ class Dashboard:
 
     def _on_scan(self) -> None:
         from Core.Scanner import Scanner
+
         scanner = Scanner(logger=self._logger)
         report = scanner.run_full_scan()
         self._show(self._format_report("System Scan", report))
 
     def _on_hardware(self) -> None:
         from Core.Hardware import Hardware
-        hw = Hardware(logger=self._logger)
-        report = hw.full_report()
+
+        hardware = Hardware(logger=self._logger)
+        report = hardware.full_report()
         self._show(self._format_report("Hardware Report", report))
 
     def _on_network(self) -> None:
         from Core.Network import Network
-        net = Network(logger=self._logger)
+
+        network = Network(logger=self._logger)
         lines = [
-            f"Internet: {'OK' if net.check_connectivity() else 'FAILED'}",
-            f"DNS:      {'OK' if net.check_dns() else 'FAILED'}",
+            f"Internet: {'OK' if network.check_connectivity() else 'FAILED'}",
+            f"DNS:      {'OK' if network.check_dns() else 'FAILED'}",
         ]
         self._show("Network Diagnostics\n" + "-" * 30 + "\n" + "\n".join(lines))
 
     def _on_startup(self) -> None:
         from Core.Startup import Startup
+
         entries = Startup(logger=self._logger).list_entries()
-        lines = [f"{e['name']}: {e['path']}" for e in entries] or ["No startup entries found."]
-        self._show("Startup Manager\n" + "-" * 30 + "\n" + "\n".join(lines))
+        lines = [f"{entry['name']}: {entry['path']}" for entry in entries]
+        self._show(
+            "Startup Manager\n"
+            + "-" * 30
+            + "\n"
+            + "\n".join(lines or ["No startup entries found."])
+        )
 
     def _on_backup(self) -> None:
         from Core.Backup import Backup
+
         archives = Backup(logger=self._logger).list_backups()
-        lines = archives or ["No backups found."]
-        self._show("Backup Archives\n" + "-" * 30 + "\n" + "\n".join(lines))
+        self._show(
+            "Backup Archives\n"
+            + "-" * 30
+            + "\n"
+            + "\n".join(archives or ["No backups found."])
+        )
 
     # ------------------------------------------------------------------
     # Output helpers
@@ -133,6 +141,7 @@ class Dashboard:
 
     def _show(self, text: str) -> None:
         import tkinter as tk
+
         self._output.config(state=tk.NORMAL)
         self._output.delete("1.0", tk.END)
         self._output.insert(tk.END, text)
@@ -144,8 +153,8 @@ class Dashboard:
         for section, data in report.items():
             lines.append(f"\n[{section.upper()}]")
             if isinstance(data, dict):
-                for k, v in data.items():
-                    lines.append(f"  {k}: {v}")
+                for key, value in data.items():
+                    lines.append(f"  {key}: {value}")
             else:
                 lines.append(f"  {data}")
         return "\n".join(lines)

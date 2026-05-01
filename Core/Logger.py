@@ -1,18 +1,16 @@
-"""
-Core/Logger.py — Centralised logging for PocketMedic.
-"""
+"""Centralized logging for PocketMedic."""
 
-import os
 import logging
+import os
 from datetime import datetime
 
 
-LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "Logs")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+LOG_DIR = os.path.join(PROJECT_ROOT, "Logs")
 
 
 class Logger:
-    """Wrapper around Python's logging module that writes to a dated log file
-    inside the Logs/ directory as well as to the console."""
+    """Write PocketMedic messages to a dated log file and the console."""
 
     def __init__(self, name: str = "PocketMedic", level: str = "INFO"):
         os.makedirs(LOG_DIR, exist_ok=True)
@@ -29,22 +27,20 @@ class Logger:
                 datefmt="%H:%M:%S",
             )
 
-            # File handler
-            fh = logging.FileHandler(log_path, encoding="utf-8")
-            fh.setFormatter(formatter)
-            self._logger.addHandler(fh)
+            file_handler = logging.FileHandler(log_path, encoding="utf-8")
+            file_handler.setFormatter(formatter)
+            self._logger.addHandler(file_handler)
 
-            # Console handler
-            ch = logging.StreamHandler()
-            ch.setFormatter(formatter)
-            self._logger.addHandler(ch)
+            console_handler = logging.StreamHandler()
+            console_handler.setFormatter(formatter)
+            self._logger.addHandler(console_handler)
 
     # ------------------------------------------------------------------
     # Public helpers
     # ------------------------------------------------------------------
 
     def log(self, message: str) -> None:
-        """Alias for info()."""
+        """Log an informational message."""
         self._logger.info(message)
 
     def info(self, message: str) -> None:

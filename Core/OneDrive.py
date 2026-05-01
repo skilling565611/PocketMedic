@@ -1,9 +1,6 @@
-"""
-Core/OneDrive.py — OneDrive integration for PocketMedic.
+"""OneDrive integration helpers for PocketMedic.
 
-Provides helpers to detect, authenticate, and sync files with a user's
-OneDrive account.  On Windows this wraps the OneDrive CLI / known folder
-paths; on other platforms it falls back to graceful no-ops.
+Detects the local OneDrive folder and copies files into it when available.
 """
 
 import os
@@ -15,7 +12,6 @@ from typing import Optional
 class OneDrive:
     """OneDrive sync and offload helper."""
 
-    # Common OneDrive root locations
     _WINDOWS_ROOTS = [
         os.path.expanduser("~/OneDrive"),
         os.path.expanduser("~/OneDrive - Personal"),
@@ -30,29 +26,29 @@ class OneDrive:
     # ------------------------------------------------------------------
 
     def detect(self) -> bool:
-        """Try to locate the local OneDrive folder.
+        """Try to locate the local OneDrive folder."""
+        if platform.system() != "Windows":
+            self._log("OneDrive detection is only supported on Windows.")
+            return False
 
-        Returns True if found and sets *self._root*.
-        """
-        if platform.system() == "Windows":
-            # Check environment variable first (most reliable)
-            env_root = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
-            if env_root and os.path.isdir(env_root):
-                self._root = env_root
+        env_root = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
+        if env_root and os.path.isdir(env_root):
+            self._root = env_root
+            self._log(f"OneDrive detected at: {self._root}")
+            return True
+
+        for candidate in self._WINDOWS_ROOTS:
+            if os.path.isdir(candidate):
+                self._root = candidate
                 self._log(f"OneDrive detected at: {self._root}")
                 return True
-            for candidate in self._WINDOWS_ROOTS:
-                if os.path.isdir(candidate):
-                    self._root = candidate
-                    self._log(f"OneDrive detected at: {self._root}")
-                    return True
 
         self._log("OneDrive not detected on this system.")
         return False
 
     @property
     def root(self) -> Optional[str]:
-        """The local OneDrive root path, or None if not detected."""
+        """Return the local OneDrive root path, or None if not detected."""
         return self._root
 
     def is_available(self) -> bool:
@@ -60,12 +56,9 @@ class OneDrive:
         return self._root is not None
 
     def copy_to_onedrive(self, src: str, relative_dest: str) -> bool:
-        """Copy *src* into OneDrive at *relative_dest* (relative to OneDrive root).
-
-        Returns True on success.
-        """
+        """Copy a file into OneDrive at a path relative to the OneDrive root."""
         if not self.is_available():
-            self._log("OneDrive not available — skipping copy.")
+            self._log("OneDrive not available; skipping copy.")
             return False
 
         dest = os.path.join(self._root, relative_dest)

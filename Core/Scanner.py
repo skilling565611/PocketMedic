@@ -1,19 +1,17 @@
-"""
-Core/Scanner.py — System scanner module for PocketMedic.
+"""System scanner module for PocketMedic.
 
-Gathers information about the host system: OS, CPU, RAM, disk, and running
-processes.  Results are returned as plain Python dicts so they can be
-displayed in the UI or persisted to a log.
+Gathers information about the host system. Results are returned as plain
+Python dicts so they can be displayed in the UI or persisted to a log.
 """
 
-import platform
 import os
+import platform
 import shutil
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 class Scanner:
-    """Collects system health and configuration data."""
+    """Collect system health and configuration data."""
 
     def __init__(self, logger=None):
         self._logger = logger
@@ -33,7 +31,7 @@ class Scanner:
         return report
 
     def scan_os(self) -> Dict[str, str]:
-        """Return basic OS / platform information."""
+        """Return basic OS and platform information."""
         return {
             "system": platform.system(),
             "release": platform.release(),
@@ -49,9 +47,9 @@ class Scanner:
         total, used, free = shutil.disk_usage(root)
         return {
             "root": root,
-            "total_gb": round(total / 1024 ** 3, 2),
-            "used_gb": round(used / 1024 ** 3, 2),
-            "free_gb": round(free / 1024 ** 3, 2),
+            "total_gb": round(total / 1024**3, 2),
+            "used_gb": round(used / 1024**3, 2),
+            "free_gb": round(free / 1024**3, 2),
         }
 
     # ------------------------------------------------------------------
