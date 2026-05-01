@@ -19,6 +19,7 @@ class TerminalUI:
         ("5", "Backup", "backup"),
         ("6", "Rebuild Assistant", "rebuild"),
         ("7", "Maintenance Utilities", "utilities"),
+        ("8", "App Installer", "app_installer"),
         ("Q", "Quit", "quit"),
     ]
 
@@ -149,7 +150,10 @@ class TerminalUI:
 
         storage = Storage(logger=self._logger)
         settings = storage.load_json("Config/Global.Settings.json")
-        installer_packages = settings.get("installer_packages", [])
+        definitions_path = settings.get(
+            "package_definitions_path",
+            "Config/Package.Definitions.json",
+        )
         startup_delay = settings.get("startup_delay_seconds", 30)
         offload_relative = settings.get("storage_offload", {}).get(
             "default_relative_path",
@@ -170,8 +174,9 @@ class TerminalUI:
 
         report = {
             "installer_engine": {
-                "manager_status": installer.manager_status(),
-                "packages": installer.verify_packages(installer_packages),
+                "install_plan": installer.build_install_plan(
+                    installer.load_package_definitions(definitions_path)
+                ),
             },
             "onedrive_integration": onedrive_status,
             "storage_offload_system": {
@@ -197,6 +202,41 @@ class TerminalUI:
 
         print("\n  -- Maintenance Utilities --")
         self._print_report(report)
+
+    def _action_app_installer(self) -> None:
+        from Core.Installer import Installer
+        from Core.Storage import Storage
+
+        storage = Storage(logger=self._logger)
+        settings = storage.load_json("Config/Global.Settings.json")
+        definitions_path = settings.get(
+            "package_definitions_path",
+            "Config/Package.Definitions.json",
+        )
+
+        installer = Installer(logger=self._logger)
+        definitions = installer.load_package_definitions(definitions_path)
+        plan = installer.build_install_plan(definitions)
+
+        print("\n  -- App Installer Framework --")
+        self._print_install_plan(plan)
+
+        if plan.get("missing_count", 0) == 0:
+            print("\n  All enabled packages are already detected.")
+            return
+
+        print("\n  Type INSTALL to install missing enabled packages.")
+        print("  Press Enter to cancel without changes.")
+        confirmation = input("  Confirm install: ").strip()
+        if confirmation != "INSTALL":
+            results = installer.install_missing_from_plan(plan, confirmed=False)
+            print("\n  Install canceled.")
+            self._print_value(results, indent=4)
+            return
+
+        results = installer.install_missing_from_plan(plan, confirmed=True)
+        print("\n  Install Results")
+        self._print_value(results, indent=4)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -233,6 +273,21 @@ class TerminalUI:
         for section, data in report.items():
             print(f"\n  [{section.upper()}]")
             TerminalUI._print_value(data, indent=4)
+
+    @staticmethod
+    def _print_install_plan(plan: dict) -> None:
+        manager = plan.get("manager_status", {}).get("active_manager")
+        print(f"\n  Package manager: {manager or 'not detected'}")
+        print(f"  Missing packages: {plan.get('missing_count', 0)}")
+        print("  Manual confirmation required: yes")
+
+        for package in plan.get("packages", []):
+            status = "INSTALLED" if package.get("installed") else "MISSING"
+            print(f"\n  [{status}] {package.get('display_name')}")
+            print(f"    key: {package.get('key')}")
+            print(f"    category: {package.get('category')}")
+            print(f"    winget_id: {package.get('winget_id')}")
+            print(f"    command: {package.get('install_command') or '(none)'}")
 
     @staticmethod
     def _print_value(value, indent: int) -> None:

@@ -1,0 +1,30 @@
+{
+    "packages": [
+        {
+            "key": "python",
+            "display_name": "Python",
+            "enabled": true,
+            "category": "runtime",
+            "winget_id": "Python.Python.3.12",
+            "detect": {
+                "commands": [
+                    "python"
+                ],
+                "paths": []
+            }
+        },
+        {
+            "key": "git",
+            "display_name": "Git",
+            "enabled": true,
+            "category": "developer_tools",
+            "winget_id": "Git.Git",
+            "detect": {
+                "commands": [
+                    "git"
+                ],
+                "paths": []
+            }
+        }
+    ]
+}

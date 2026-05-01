@@ -14,9 +14,6 @@ from Core.Network import Network
 from Core.OneDrive import OneDrive
 
 
-DEFAULT_PACKAGES = ["python", "git"]
-
-
 @dataclass
 class RebuildStep:
     """A single rebuild workflow step."""
@@ -177,9 +174,9 @@ class RebuildAssistant:
 
     def prepare_packages(self) -> Dict[str, Any]:
         """Prepare package installer hooks without installing packages."""
-        manager_status = self._installer.manager_status()
+        plan = self._installer.build_install_plan()
+        manager_status = plan["manager_status"]
         manager = manager_status["active_manager"]
-        package_hooks = self._installer.verify_packages(DEFAULT_PACKAGES)
 
         return {
             "status": "pass" if manager_status["ready"] else "warning",
@@ -191,7 +188,8 @@ class RebuildAssistant:
             "details": {
                 "manager_status": manager_status,
                 "safe_mode": "Commands are prepared only; no packages were installed.",
-                "packages": package_hooks,
+                "missing_count": plan["missing_count"],
+                "packages": plan["packages"],
             },
         }
 
