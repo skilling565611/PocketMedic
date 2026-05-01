@@ -1,0 +1,22 @@
+{
+    "profile_name": "ArcticPrime",
+    "description": "Primary profile for Arctic Prime hardware target",
+    "hardware": {
+        "target": "ArcticPrime",
+        "ram_gb": 8,
+        "storage_type": "SSD"
+    },
+    "scan": {
+        "deep_scan": true,
+        "check_drivers": true,
+        "check_startup": true
+    },
+    "backup": {
+        "enabled": true,
+        "destinations": ["OneDrive", "LocalExternal"]
+    },
+    "network": {
+        "check_connectivity": true,
+        "preferred_dns": ["8.8.8.8", "1.1.1.1"]
+    }
+}

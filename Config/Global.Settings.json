@@ -1,0 +1,12 @@
+{
+    "app_name": "PocketMedic",
+    "version": "0.1.0",
+    "log_level": "INFO",
+    "log_dir": "Logs",
+    "portable_tools_dir": "PortableTools",
+    "scripts_dir": "Scripts",
+    "backup_enabled": true,
+    "onedrive_sync_enabled": false,
+    "theme": "default",
+    "active_profile": "ArcticPrime"
+}
