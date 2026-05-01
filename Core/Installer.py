@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from Core.ConfigManager import ConfigManager
-from Core.Paths import app_path, find_resource
+from Core.Paths import app_base_dir, external_base_dir, external_path, find_resource
 
 
 DEFAULT_DEFINITIONS_PATH = os.path.join("Config", "Package.Definitions.json")
@@ -135,6 +135,7 @@ class Installer:
             "use_winget_fallback": False,
             "installer_policy": "EXE-only",
             "installer_search_paths": self.get_installer_search_paths(),
+            "installer_debug": self.installer_debug_info(),
             "manual_confirmation_required": True,
             "packages": packages,
             "missing_count": len(missing),
@@ -175,7 +176,15 @@ class Installer:
 
     def get_installer_search_paths(self) -> List[Dict[str, str]]:
         """Return local EXE installer search paths."""
-        paths = [{"source": "Local", "path": app_path("Installers")}]
+        paths = [
+            {"source": "Local", "path": external_path("Installers")},
+            {"source": "Local", "path": external_path("EXE")},
+            {"source": "Local", "path": external_path("PortableTools")},
+            {
+                "source": "Local",
+                "path": external_path("PocketMedic_Data", "Installers"),
+            },
+        ]
 
         onedrive = os.environ.get("OneDrive") or os.environ.get("OneDriveConsumer")
         if not onedrive:
@@ -195,6 +204,27 @@ class Installer:
             for drive in self._removable_drives()
         )
         return self._dedupe_locations(paths)
+
+    def installer_debug_info(self) -> Dict[str, Any]:
+        """Return EXE installer discovery diagnostics for terminal output."""
+        searched_folders = []
+        for location in self.get_installer_search_paths():
+            directory = location["path"]
+            exists = os.path.isdir(directory)
+            searched_folders.append(
+                {
+                    "source": location["source"],
+                    "path": directory,
+                    "exists": exists,
+                    "installer_exes": self._installer_exes(directory) if exists else [],
+                }
+            )
+
+        return {
+            "app_base_dir": app_base_dir(),
+            "external_base_dir": external_base_dir(),
+            "searched_installer_folders": searched_folders,
+        }
 
     def verify_packages(self, package_names: List[str]) -> List[Dict[str, object]]:
         """Return install status and install previews for requested packages."""
@@ -507,6 +537,16 @@ class Installer:
             if os.path.isfile(match) and match.lower().endswith(".exe"):
                 return match
         return None
+
+    @staticmethod
+    def _installer_exes(directory: str) -> List[str]:
+        import glob
+
+        return [
+            os.path.normpath(path)
+            for path in sorted(glob.glob(os.path.join(directory, "*.exe")))
+            if os.path.isfile(path)
+        ]
 
     @staticmethod
     def _removable_drives() -> List[str]:

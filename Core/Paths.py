@@ -2,6 +2,7 @@
 
 import os
 import sys
+from pathlib import Path
 
 
 def is_frozen() -> bool:
@@ -23,9 +24,19 @@ def resource_root() -> str:
 
 def app_root() -> str:
     """Return the root used for writable runtime files."""
+    return external_base_dir()
+
+
+def app_base_dir() -> str:
+    """Return the executable/source application base directory."""
     if is_frozen():
-        return os.path.dirname(sys.executable)
+        return str(Path(sys.executable).resolve().parent)
     return project_root()
+
+
+def external_base_dir() -> str:
+    """Return the root used for external user-editable files."""
+    return app_base_dir()
 
 
 def resource_path(*parts: str) -> str:
@@ -36,6 +47,11 @@ def resource_path(*parts: str) -> str:
 def app_path(*parts: str) -> str:
     """Build a path under the writable application root."""
     return os.path.join(app_root(), *parts)
+
+
+def external_path(*parts: str) -> str:
+    """Build a path under the external application root."""
+    return os.path.join(external_base_dir(), *parts)
 
 
 def resolve_resource(path: str) -> str:

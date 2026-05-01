@@ -321,6 +321,7 @@ class TerminalUI:
         print(f"  Missing installer EXEs: {plan.get('missing_count', 0)}")
         print(f"  Runnable install actions: {plan.get('actionable_count', 0)}")
         print("  Manual confirmation required: yes")
+        TerminalUI._print_installer_debug(plan.get("installer_debug", {}))
 
         for package in plan.get("packages", []):
             status = package.get("installer_status", "Missing").upper()
@@ -352,6 +353,30 @@ class TerminalUI:
             path = match.get("path") or "(none)"
             valid = match.get("valid_diagnostic")
             print(f"      - {match.get('command')}: {path} (diagnostic_valid={valid})")
+
+    @staticmethod
+    def _print_installer_debug(debug: dict) -> None:
+        print("\n  Installer discovery debug:")
+        print(f"    app_base_dir: {debug.get('app_base_dir') or '(unknown)'}")
+        print(f"    external_base_dir: {debug.get('external_base_dir') or '(unknown)'}")
+        print("    searched_installer_folders:")
+
+        folders = debug.get("searched_installer_folders", [])
+        if not folders:
+            print("      (none)")
+            return
+
+        for folder in folders:
+            print(f"      - {folder.get('path')}")
+            print(f"        source: {folder.get('source')}")
+            print(f"        exists: {folder.get('exists')}")
+            installer_exes = folder.get("installer_exes", [])
+            if installer_exes:
+                print("        installer_exes:")
+                for installer in installer_exes:
+                    print(f"          - {installer}")
+            else:
+                print("        installer_exes: (none)")
 
     @staticmethod
     def _print_value(value, indent: int) -> None:
